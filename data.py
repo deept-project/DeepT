@@ -21,13 +21,16 @@ def batch(iterable, n=1):
         yield iterable[ndx:min(ndx + n, l)]
 
 class TranslationDataset(torch.utils.data.Dataset):
-    def __init__(self, source_path, target_path):
+    def __init__(self, source_path, target_path, tokenizer=None):
         self.source_path = source_path
         self.target_path = target_path
         self.source_ids_path = source_path + '.npy'
         self.target_ids_path = target_path + '.npy'
         # tokenizer
-        self.tokenizer = transformers.BertTokenizerFast.from_pretrained('bert-base-multilingual-cased')
+        if tokenizer is None:
+            self.tokenizer = transformers.BertTokenizerFast.from_pretrained('bert-base-multilingual-cased')
+        else:
+            self.tokenizer = tokenizer
 
         preprocess_batch_size = 20480
         print('tokenize source texts')
