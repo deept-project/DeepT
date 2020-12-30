@@ -139,3 +139,4 @@ cython_debug/
 
 .vscode/
 data/
+lightning_logs/
