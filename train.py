@@ -5,6 +5,9 @@ import transformers
 from data import TranslationDataset
 from model import BartForMaskedLM
 import torch
+import tqdm
+
+from translate import GreedySearch
 
 class PadFunction(object):
     def __init__(self, pad_id=0):
@@ -13,8 +16,10 @@ class PadFunction(object):
     def __call__(self, batch):
         return self._pad_fn(batch)
 
-    def merge(self, sequences, pad_size):
+    def merge(self, sequences, pad_size=None):
         lengths = [len(seq) for seq in sequences]
+        if pad_size is None:
+            pad_size = max(lengths)
         padded_seqs = torch.full((len(sequences), pad_size), self.pad_id).long()
         for i, seq in enumerate(sequences):
             end = lengths[i]
@@ -29,7 +34,8 @@ class PadFunction(object):
         src_seqs, trg_seqs = zip(*batch)
 
         # merge sequences (from tuple of 1D tensor to 2D tensor)
-        pad_size = max([len(seq) for seq in src_seqs] + [len(seq) for seq in trg_seqs])
+        # pad_size = max([len(seq) for seq in src_seqs] + [len(seq) for seq in trg_seqs])
+        pad_size=None
         src_seqs, src_lengths = self.merge(src_seqs, pad_size)
         trg_seqs, trg_lengths = self.merge(trg_seqs, pad_size)
 
@@ -58,24 +64,50 @@ def pad_fn(batch):
     return src_seqs, src_lengths, trg_seqs, trg_lengths
 
 if __name__ == "__main__":
-    tokenizer = transformers.BertTokenizerFast.from_pretrained('bert-base-multilingual-cased')
+    tokenizer = transformers.BertTokenizerFast('./vocab/vocab.txt')
+    setattr(tokenizer, "_bos_token", '[CLS]')
+    setattr(tokenizer, "_eos_token", '[SEP]')
 
-    dataset = TranslationDataset('data/debug.en', 'data/debug.zh', tokenizer=tokenizer)
+    dataset = TranslationDataset('data/train.en', 'data/train.zh', tokenizer=tokenizer)
     pad_fn_object = PadFunction(tokenizer.pad_token_id)
-    train_loader = torch.utils.data.DataLoader(dataset, batch_size=32, collate_fn=pad_fn_object)
+    train_loader = torch.utils.data.DataLoader(dataset, batch_size=2, collate_fn=pad_fn_object)
 
     # init model
-    model = BartForMaskedLM()
+    model = BartForMaskedLM(tokenizer=tokenizer)
 
     # most basic trainer, uses good defaults (auto-tensorboard, checkpoints, logs, and more)
     # trainer = pl.Trainer(gpus=8) (if you have GPUs)
-    trainer = pl.Trainer(gpus=[1], max_epochs=10)
+    trainer = pl.Trainer(gpus=[0, 1], max_epochs=20, checkpoint_callback=False)
     trainer.fit(model, train_loader)
 
-    inputs = tokenizer(["Pair of winner"], max_length=1024, return_tensors='pt') # , padding="max_length", truncation=True
+
+    inputs = tokenizer(["Yeah, Yeah, Yeah."], max_length=1024, return_tensors='pt') # , padding="max_length", truncation=True
 
     # Generate Summary
-    output = model(inputs['input_ids'])[0]
-    max, translation_ids = torch.max(output, dim=1)
+    greedy_search = GreedySearch(
+        pad_id=tokenizer.pad_token_id,
+        bos_id=tokenizer.bos_token_id,
+        eos_id=tokenizer.eos_token_id,
+        min_length=1,
+        max_length=1024)
+
+    input = inputs['input_ids']
+    translation_ids = []
+    labels = []
+    labels.append(tokenizer.bos_token_id)
+    for i in tqdm.tqdm(iterable=range(len(input[0]))):
+        labels_tensor = torch.tensor(labels)
+        output = model((input, [len(input[0])], torch.unsqueeze(labels_tensor, 0), [len(labels)]))[0,:,:]
+        cur_output = output[i,:]
+        max_prob, max_ids = torch.max(cur_output, dim=0)
+
+        # show 
+        show_max_prob, show_max_ids = torch.max(output, dim=1)
+        print([tokenizer.decode(g, skip_special_tokens=True, clean_up_tokenization_spaces=False) for g in show_max_ids])
+
+        translation_ids.append(max_ids.item())
+        labels.append(max_ids.item())
     print(translation_ids)
+
+    # translation_ids = greedy_search.search(output)
     print([tokenizer.decode(g, skip_special_tokens=True, clean_up_tokenization_spaces=False) for g in translation_ids])

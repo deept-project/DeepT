@@ -35,33 +35,31 @@ class TranslationDataset(torch.utils.data.Dataset):
         preprocess_batch_size = 20480
         print('tokenize source texts')
         self.input_ids = []
-        if not os.path.exists(self.source_ids_path):
-            with open(self.source_path, 'r', encoding='utf-8') as f:
-                self.source = f.read().splitlines()
-            for each_lines in tqdm.tqdm(iterable=batch(self.source, preprocess_batch_size), total=len(self.source)//preprocess_batch_size):
-                ids = self.tokenizer(each_lines, max_length=1024, truncation=True, is_split_into_words=False)['input_ids']
-                for each_id in ids:
-                    self.input_ids.append(torch.tensor(each_id, dtype=torch.int32))
-            save_bin(self.source_ids_path, self.input_ids)
-            del self.source
-        else:
-            self.input_ids=load_bin(self.source_ids_path)
+        # if not os.path.exists(self.source_ids_path):
+        with open(self.source_path, 'r', encoding='utf-8') as f:
+            self.source = f.read().splitlines()
+        for each_lines in tqdm.tqdm(iterable=batch(self.source, preprocess_batch_size), total=len(self.source)//preprocess_batch_size):
+            ids = self.tokenizer(each_lines, max_length=1024, truncation=True, is_split_into_words=False)['input_ids']
+            for each_id in ids:
+                self.input_ids.append(torch.tensor(each_id, dtype=torch.int32))
+        # save_bin(self.source_ids_path, self.input_ids)
+        del self.source
+        # else:
+        #    self.input_ids=load_bin(self.source_ids_path)
         
-        
-
         print('tokenize target texts')
         self.labels = []
-        if not os.path.exists(self.target_ids_path):
-            with open(self.target_path, 'r', encoding='utf-8') as f:
-                self.target = f.read().splitlines()
-            for each_lines in tqdm.tqdm(iterable=batch(self.target, preprocess_batch_size), total=len(self.target)//preprocess_batch_size):
-                ids = self.tokenizer(each_lines, max_length=1024, truncation=True, is_split_into_words=False)['input_ids']
-                for each_id in ids:
-                    self.labels.append(torch.tensor(each_id, dtype=torch.int32))
-            save_bin(self.target_ids_path, self.labels)
-            del self.target
-        else:
-            self.labels=load_bin(self.target_ids_path)
+        # if not os.path.exists(self.target_ids_path):
+        with open(self.target_path, 'r', encoding='utf-8') as f:
+            self.target = f.read().splitlines()
+        for each_lines in tqdm.tqdm(iterable=batch(self.target, preprocess_batch_size), total=len(self.target)//preprocess_batch_size):
+            ids = self.tokenizer(each_lines, max_length=1024, truncation=True, is_split_into_words=False)['input_ids']
+            for each_id in ids:
+                self.labels.append(torch.tensor(each_id, dtype=torch.int32))
+        # save_bin(self.target_ids_path, self.labels)
+        del self.target
+        # else:
+        #    self.labels=load_bin(self.target_ids_path)
 
     def __getitem__(self, i):
         return (self.input_ids[i], self.labels[i])
