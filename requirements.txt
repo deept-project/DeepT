@@ -1,0 +1,5 @@
+numpy==1.19.4
+transformers==4.1.1
+pytorch_lightning==1.1.2
+tqdm==4.55.0
+torch==1.8.0a0

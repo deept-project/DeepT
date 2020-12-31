@@ -9,6 +9,9 @@ import tqdm
 
 from translate import GreedySearch
 
+import os
+os.environ["TOKENIZERS_PARALLELISM"] = "false"
+
 class PadFunction(object):
     def __init__(self, pad_id=0):
         self.pad_id = pad_id
@@ -68,20 +71,34 @@ if __name__ == "__main__":
     setattr(tokenizer, "_bos_token", '[CLS]')
     setattr(tokenizer, "_eos_token", '[SEP]')
 
-    dataset = TranslationDataset('data/train.en', 'data/train.zh', tokenizer=tokenizer)
+    debug=True
+    if not debug:
+        dataset = TranslationDataset(
+            'data/train.en', 'data/train.zh', tokenizer=tokenizer
+        )
+    else:
+        dataset = TranslationDataset(
+            'data/debug_mini.en', 'data/debug_mini.zh', tokenizer=tokenizer
+        )
     pad_fn_object = PadFunction(tokenizer.pad_token_id)
-    train_loader = torch.utils.data.DataLoader(dataset, batch_size=2, collate_fn=pad_fn_object)
+    train_loader = torch.utils.data.DataLoader(dataset, num_workers=8, batch_size=2, collate_fn=pad_fn_object)
 
     # init model
-    model = BartForMaskedLM(tokenizer=tokenizer)
+    model = BartForMaskedLM(
+        config={
+            'vocab_size': tokenizer.vocab_size,
+            'bos_token_id': tokenizer.bos_token_id,
+            'eos_token_id': tokenizer.eos_token_id,
+            'pad_token_id': tokenizer.pad_token_id,
+        }
+    )
 
     # most basic trainer, uses good defaults (auto-tensorboard, checkpoints, logs, and more)
     # trainer = pl.Trainer(gpus=8) (if you have GPUs)
-    trainer = pl.Trainer(gpus=[0, 1], max_epochs=20, checkpoint_callback=False)
+    trainer = pl.Trainer(gpus=[0], accelerator='ddp', max_epochs=3, checkpoint_callback=False)
     trainer.fit(model, train_loader)
 
-
-    inputs = tokenizer(["Yeah, Yeah, Yeah."], max_length=1024, return_tensors='pt') # , padding="max_length", truncation=True
+    inputs = tokenizer(["One against 500."], max_length=1024, return_tensors='pt') # , padding="max_length", truncation=True
 
     # Generate Summary
     greedy_search = GreedySearch(
