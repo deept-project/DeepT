@@ -2,7 +2,7 @@ import pytorch_lightning as pl
 import torch
 import transformers
 
-from data import TranslationDataset
+from dataset import TranslationDataset
 from model import BartForMaskedLM
 import torch
 import tqdm
@@ -29,6 +29,12 @@ class PadFunction(object):
             padded_seqs[i, :end] = seq[:end]
         return padded_seqs, lengths
 
+    def make_mask(self, inputs, inputs_length):
+        inputs_mask = torch.zeros_like(inputs)
+        for i in range(inputs_mask.size(0)):
+            inputs_mask[i,:inputs_length[i]] = 1
+        return inputs_mask
+
     def _pad_fn(self, batch):
         # sort a list by sequence length (descending order) to use pack_padded_sequence
         batch.sort(key=lambda x: len(x[0]), reverse=True)
@@ -42,36 +48,25 @@ class PadFunction(object):
         src_seqs, src_lengths = self.merge(src_seqs, pad_size)
         trg_seqs, trg_lengths = self.merge(trg_seqs, pad_size)
 
-        return src_seqs, src_lengths, trg_seqs, trg_lengths
+        source_tokens = {
+            'token_ids': src_seqs,
+            'mask': self.make_mask(src_seqs, src_lengths),
+            'length': src_lengths
+        }
 
-def pad_fn(batch):
-    def merge(sequences, pad_size):
-        lengths = [len(seq) for seq in sequences]
-        padded_seqs = torch.zeros(len(sequences), pad_size).long()
-        for i, seq in enumerate(sequences):
-            end = lengths[i]
-            padded_seqs[i, :end] = seq[:end]
-        return padded_seqs, lengths
-
-    # sort a list by sequence length (descending order) to use pack_padded_sequence
-    batch.sort(key=lambda x: len(x[0]), reverse=True)
-
-    # seperate source and target sequences
-    src_seqs, trg_seqs = zip(*batch)
-
-    # merge sequences (from tuple of 1D tensor to 2D tensor)
-    pad_size = max([len(seq) for seq in src_seqs] + [len(seq) for seq in trg_seqs])
-    src_seqs, src_lengths = merge(src_seqs, pad_size)
-    trg_seqs, trg_lengths = merge(trg_seqs, pad_size)
-
-    return src_seqs, src_lengths, trg_seqs, trg_lengths
+        target_tokens = {
+            'token_ids': trg_seqs,
+            'mask': self.make_mask(trg_seqs, trg_lengths),
+            'length': trg_lengths
+        }
+        return source_tokens, target_tokens
 
 if __name__ == "__main__":
     tokenizer = transformers.BertTokenizerFast('./vocab/vocab.txt')
     setattr(tokenizer, "_bos_token", '[CLS]')
     setattr(tokenizer, "_eos_token", '[SEP]')
 
-    debug=True
+    debug=False
     if not debug:
         dataset = TranslationDataset(
             'data/train.en', 'data/train.zh', tokenizer=tokenizer
@@ -81,7 +76,8 @@ if __name__ == "__main__":
             'data/debug_mini.en', 'data/debug_mini.zh', tokenizer=tokenizer
         )
     pad_fn_object = PadFunction(tokenizer.pad_token_id)
-    train_loader = torch.utils.data.DataLoader(dataset, num_workers=8, batch_size=2, collate_fn=pad_fn_object)
+    rand_sampler = torch.utils.data.RandomSampler(dataset, replacement=False)
+    train_loader = torch.utils.data.DataLoader(dataset, num_workers=8, batch_size=4, collate_fn=pad_fn_object, sampler=rand_sampler)
 
     # init model
     model = BartForMaskedLM(
@@ -95,10 +91,10 @@ if __name__ == "__main__":
 
     # most basic trainer, uses good defaults (auto-tensorboard, checkpoints, logs, and more)
     # trainer = pl.Trainer(gpus=8) (if you have GPUs)
-    trainer = pl.Trainer(gpus=[0], accelerator='ddp', max_epochs=3, checkpoint_callback=False)
+    trainer = pl.Trainer(gpus=[0, 1], accelerator='ddp', max_epochs=10, checkpoint_callback=True) # precision=16,
     trainer.fit(model, train_loader)
 
-    inputs = tokenizer(["One against 500."], max_length=1024, return_tensors='pt') # , padding="max_length", truncation=True
+    inputs = tokenizer(["One pair of couple is winner."], max_length=1024, truncation=True, return_tensors='pt') # , padding="max_length", truncation=True
 
     # Generate Summary
     greedy_search = GreedySearch(
@@ -108,23 +104,20 @@ if __name__ == "__main__":
         min_length=1,
         max_length=1024)
 
-    input = inputs['input_ids']
-    translation_ids = []
-    labels = []
-    labels.append(tokenizer.bos_token_id)
-    for i in tqdm.tqdm(iterable=range(len(input[0]))):
-        labels_tensor = torch.tensor(labels)
-        output = model((input, [len(input[0])], torch.unsqueeze(labels_tensor, 0), [len(labels)]))[0,:,:]
-        cur_output = output[i,:]
-        max_prob, max_ids = torch.max(cur_output, dim=0)
+    def predit_fn(source_inputs: torch.Tensor, states: torch.Tensor):
+        batch_size = source_inputs.size(0)
+        source_list = [source_inputs[i,:] for i in range(batch_size)]
+        state_list = [states[i,:] for i in range(batch_size)]
 
-        # show 
-        show_max_prob, show_max_ids = torch.max(output, dim=1)
-        print([tokenizer.decode(g, skip_special_tokens=True, clean_up_tokenization_spaces=False) for g in show_max_ids])
+        batch = pad_fn_object(list(zip(source_list, state_list)))
+        output = model(batch)
+        return output
 
-        translation_ids.append(max_ids.item())
-        labels.append(max_ids.item())
-    print(translation_ids)
+    source_inputs = inputs['input_ids']
+    batch_size = source_inputs.size(0)
+    init_states = torch.full((batch_size, 1), tokenizer.bos_token_id)
+    translation_ids = greedy_search.search(source_inputs, init_states, predit_fn)
+
 
     # translation_ids = greedy_search.search(output)
-    print([tokenizer.decode(g, skip_special_tokens=True, clean_up_tokenization_spaces=False) for g in translation_ids])
+    print([tokenizer.decode(g, skip_special_tokens=True, clean_up_tokenization_spaces=False) for g in translation_ids[0]])
