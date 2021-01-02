@@ -6,9 +6,11 @@ from dataset import TranslationDataset
 from model import BartForMaskedLM
 import torch
 import tqdm
+import numpy as np
 
 from translate import GreedySearch
 
+import random
 import os
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
@@ -62,22 +64,29 @@ class PadFunction(object):
         return source_tokens, target_tokens
 
 if __name__ == "__main__":
+    # params
+    random_seed = 0
+    validation_split = 0.1
+
     tokenizer = transformers.BertTokenizerFast('./vocab/vocab.txt')
     setattr(tokenizer, "_bos_token", '[CLS]')
     setattr(tokenizer, "_eos_token", '[SEP]')
 
-    debug=False
-    if not debug:
-        dataset = TranslationDataset(
-            'data/train.en', 'data/train.zh', tokenizer=tokenizer
-        )
-    else:
-        dataset = TranslationDataset(
-            'data/debug_mini.en', 'data/debug_mini.zh', tokenizer=tokenizer
-        )
+    dataset = TranslationDataset('data/train.en', 'data/train.zh', tokenizer=tokenizer)
+
+    # split dataset
+    dataset_size = len(dataset)
+    split = int(np.floor(validation_split * dataset_size))
+
+    train_dataset, valid_dataset = torch.utils.data.random_split(dataset, [dataset_size-split, split], generator=torch.Generator().manual_seed(random_seed))
+
+    # Creating PT data samplers and loaders:
+    train_sampler = torch.utils.data.RandomSampler(train_dataset, replacement=False)
+    valid_sampler = torch.utils.data.SequentialSampler(valid_dataset)
+
     pad_fn_object = PadFunction(tokenizer.pad_token_id)
-    rand_sampler = torch.utils.data.RandomSampler(dataset, replacement=False)
-    train_loader = torch.utils.data.DataLoader(dataset, num_workers=4, batch_size=24, collate_fn=pad_fn_object, sampler=rand_sampler)
+    train_loader = torch.utils.data.DataLoader(train_dataset, num_workers=4, batch_size=16, collate_fn=pad_fn_object, sampler=train_sampler)
+    valid_loader = torch.utils.data.DataLoader(valid_dataset, num_workers=4, batch_size=16, collate_fn=pad_fn_object, sampler=valid_sampler)
 
     # init model
     model = BartForMaskedLM(
@@ -93,13 +102,14 @@ if __name__ == "__main__":
     # trainer = pl.Trainer(gpus=8) (if you have GPUs)
     trainer = pl.Trainer(
         gpus=[0],
-        accelerator='ddp',
         max_epochs=10,
         amp_level='O2',
         precision=16,
+        log_gpu_memory='all',
+        val_check_interval=0.1,
         checkpoint_callback=True,
         resume_from_checkpoint=None)
-    trainer.fit(model, train_loader)
+    trainer.fit(model, train_loader, valid_loader)
 
     inputs = tokenizer(["Natsu is a C++ expert."], max_length=512, truncation=True, return_tensors='pt') # , padding="max_length", truncation=True
 
