@@ -77,7 +77,7 @@ if __name__ == "__main__":
         )
     pad_fn_object = PadFunction(tokenizer.pad_token_id)
     rand_sampler = torch.utils.data.RandomSampler(dataset, replacement=False)
-    train_loader = torch.utils.data.DataLoader(dataset, num_workers=8, batch_size=4, collate_fn=pad_fn_object, sampler=rand_sampler)
+    train_loader = torch.utils.data.DataLoader(dataset, num_workers=4, batch_size=24, collate_fn=pad_fn_object, sampler=rand_sampler)
 
     # init model
     model = BartForMaskedLM(
@@ -91,10 +91,17 @@ if __name__ == "__main__":
 
     # most basic trainer, uses good defaults (auto-tensorboard, checkpoints, logs, and more)
     # trainer = pl.Trainer(gpus=8) (if you have GPUs)
-    trainer = pl.Trainer(gpus=[0, 1], accelerator='ddp', max_epochs=10, checkpoint_callback=True) # precision=16,
+    trainer = pl.Trainer(
+        gpus=[0],
+        accelerator='ddp',
+        max_epochs=10,
+        amp_level='O2',
+        precision=16,
+        checkpoint_callback=True,
+        resume_from_checkpoint=None)
     trainer.fit(model, train_loader)
 
-    inputs = tokenizer(["One pair of couple is winner."], max_length=1024, truncation=True, return_tensors='pt') # , padding="max_length", truncation=True
+    inputs = tokenizer(["Natsu is a C++ expert."], max_length=512, truncation=True, return_tensors='pt') # , padding="max_length", truncation=True
 
     # Generate Summary
     greedy_search = GreedySearch(
@@ -102,7 +109,7 @@ if __name__ == "__main__":
         bos_id=tokenizer.bos_token_id,
         eos_id=tokenizer.eos_token_id,
         min_length=1,
-        max_length=1024)
+        max_length=512)
 
     def predit_fn(source_inputs: torch.Tensor, states: torch.Tensor):
         batch_size = source_inputs.size(0)

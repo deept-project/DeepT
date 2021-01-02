@@ -14,6 +14,8 @@ class BartForMaskedLM(pl.LightningModule):
         self.vocab_size = config['vocab_size']
         self.config = transformers.BartConfig(
             vocab_size=self.vocab_size,
+            encoder_layers=6,
+            decoder_layers=6,
             max_position_embeddings=1024,
             bos_token_id=self.bos_token_id,
             eos_token_id=self.eos_token_id,
