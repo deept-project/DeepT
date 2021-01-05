@@ -41,7 +41,7 @@ class TranslationDataset(torch.utils.data.Dataset):
         
         if not os.path.exists(self.source_ids_path):
             with open(self.source_path, 'r', encoding='utf-8') as f:
-                self.source = f.read().splitlines()
+                self.source = f.read().split('\n')
             self.input_ids = np.full((len(self.source), self.max_length), self.tokenizer.pad_token_id, dtype=np.int32)
             self.input_length = np.zeros((len(self.source),), dtype=np.int32)
             i = 0
@@ -59,7 +59,7 @@ class TranslationDataset(torch.utils.data.Dataset):
         print(f'tokenize target texts from {self.target_path}')
         if not os.path.exists(self.target_ids_path):
             with open(self.target_path, 'r', encoding='utf-8') as f:
-                self.target = f.read().splitlines()
+                self.target = f.read().split('\n')
             self.labels = np.full((len(self.target), self.max_length), self.tokenizer.pad_token_id, dtype=np.int32)
             self.labels_length = np.zeros((len(self.target),), dtype=np.int32)
             i = 0
@@ -82,7 +82,6 @@ class TranslationDataset(torch.utils.data.Dataset):
 
     def __len__(self):
         return self.input_ids.shape[0]
-
 
 
 class TranslationLazyDataset(torch.utils.data.Dataset):

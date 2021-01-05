@@ -1,5 +1,6 @@
 import pytorch_lightning as pl
 from pytorch_lightning.loggers import TensorBoardLogger
+from pytorch_lightning.callbacks import GPUStatsMonitor
 import torch
 import transformers
 
@@ -30,9 +31,10 @@ if __name__ == "__main__":
 
     # most basic trainer, uses good defaults (auto-tensorboard, checkpoints, logs, and more)
     # trainer = pl.Trainer(gpus=8) (if you have GPUs)
+    gpu_stats = GPUStatsMonitor()
     logger = TensorBoardLogger('tb_logs', name='translation')
     trainer = pl.Trainer(
-        gpus=[1],
+        gpus=[0],
         # num_nodes=1,
         max_epochs=10,
         # accelerator='ddp',
@@ -46,11 +48,12 @@ if __name__ == "__main__":
         flush_logs_every_n_steps=100,
         progress_bar_refresh_rate=1,
         val_check_interval=0.5,
-        accumulate_grad_batches=4,
+        accumulate_grad_batches=16,
         sync_batchnorm=True,
         checkpoint_callback=True,
         resume_from_checkpoint=None,
         logger=logger,
+        callbacks=[],
         # profiler="simple",
     )
     # find the batch size
