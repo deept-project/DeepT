@@ -140,6 +140,7 @@ cython_debug/
 .vscode/
 data/
 lightning_logs/
+tb_logs/
 
 *.onnx
 *.lprof

@@ -37,7 +37,7 @@ class TranslationDataset(torch.utils.data.Dataset):
         self.max_length = 512
 
         preprocess_batch_size = 20480
-        print('tokenize source texts')
+        print(f'tokenize source texts from {self.source_path}')
         
         if not os.path.exists(self.source_ids_path):
             with open(self.source_path, 'r', encoding='utf-8') as f:
@@ -56,7 +56,7 @@ class TranslationDataset(torch.utils.data.Dataset):
         else:
             self.input_ids, self.input_length=load_bin(self.source_ids_path)
         
-        print('tokenize target texts')
+        print(f'tokenize target texts from {self.target_path}')
         if not os.path.exists(self.target_ids_path):
             with open(self.target_path, 'r', encoding='utf-8') as f:
                 self.target = f.read().splitlines()
@@ -82,3 +82,39 @@ class TranslationDataset(torch.utils.data.Dataset):
 
     def __len__(self):
         return self.input_ids.shape[0]
+
+
+
+class TranslationLazyDataset(torch.utils.data.Dataset):
+    # @profile
+    def __init__(self, source_path, target_path, tokenizer=None):
+        self.source_path = source_path
+        self.target_path = target_path
+
+        # tokenizer
+        if tokenizer is None:
+            self.tokenizer = transformers.BertTokenizerFast.from_pretrained('bert-base-multilingual-cased')
+        else:
+            self.tokenizer = tokenizer
+        self.max_length = 512
+
+        print(f'tokenize source texts from {self.source_path}')
+        with open(self.source_path, 'r', encoding='utf-8') as f:
+            self.source = f.read().split('\n')
+
+        print(f'tokenize target texts from {self.target_path}')
+        with open(self.target_path, 'r', encoding='utf-8') as f:
+            self.target = f.read().split('\n')
+
+        print(len(self.source), len(self.target))
+
+    def __getitem__(self, i):
+        source_ids = self.tokenizer(self.source[i], max_length=self.max_length, truncation=True, padding="do_not_pad", is_split_into_words=False)['input_ids']
+        target_ids = self.tokenizer(self.target[i], max_length=self.max_length, truncation=True, padding="do_not_pad", is_split_into_words=False)['input_ids']
+        return (
+            torch.tensor(source_ids),
+            torch.tensor(target_ids)
+            )
+
+    def __len__(self):
+        return len(self.source)

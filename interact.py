@@ -2,8 +2,11 @@
 from model import BartForMaskedLM
 import pytorch_lightning as pl
 import torch
+import torch.nn.functional as F
 import transformers
-from translate import GreedySearch
+from allennlp.nn.beam_search import BeamSearch
+
+from typing import Dict, Tuple, List
 
 
 class PadFunction(object):
@@ -56,8 +59,7 @@ class PadFunction(object):
         return source_tokens, target_tokens
 
 if __name__ == "__main__":
-    checkpoint_path = 'lightning_logs/version_3/checkpoints/epoch=4-step=565679.ckpt'
-    onnx_filepath = 'model.onnx'
+    checkpoint_path = 'tb_logs/translation/version_0/checkpoints/epoch=0-step=159521.ckpt'
 
     tokenizer = transformers.BertTokenizerFast('./vocab/vocab.txt')
     setattr(tokenizer, "_bos_token", '[CLS]')
@@ -78,15 +80,92 @@ if __name__ == "__main__":
     model.eval()
 
     # Generate Summary
-    greedy_search = GreedySearch(
-        pad_id=tokenizer.pad_token_id,
-        bos_id=tokenizer.bos_token_id,
-        eos_id=tokenizer.eos_token_id,
-        min_length=1,
-        max_length=512)
+    beam_search = BeamSearch(
+        end_index=tokenizer.eos_token_id,
+        max_steps=512,
+        beam_size=10,
+
+        )
+
+    def _dict_to_decoder_cache(cache_dict):
+        decoder_cache = []
+        for key, cache_value in cache_dict.items():
+            # Split key and extract index and dict keys
+            layer_idx, attention_name, tensor_name = key
+            # Extend decoder_cache to fit layer_idx + 1 layers
+            decoder_cache = decoder_cache + [{} for _ in range(layer_idx + 1 - len(decoder_cache))]
+            cache = decoder_cache[layer_idx]
+            if attention_name not in cache:
+                cache[attention_name] = {}
+            assert tensor_name not in cache[attention_name]
+            cache[attention_name][tensor_name] = cache_value
+        return decoder_cache
+
+    def take_step(last_predictions: torch.Tensor, state: Dict[str, torch.Tensor], step: int) -> Tuple[torch.Tensor, Dict[str, torch.Tensor]]:
+        if len(last_predictions.shape) == 1:
+            last_predictions = last_predictions.unsqueeze(-1)
+
+        batch_size = last_predictions.size(0)
+
+        # Only the last predictions are needed for the decoder, but we need to pad the decoder ids
+        # to not mess up the positional embeddings in the decoder.
+        padding_size = 0
+        if step > 0:
+            padding_size = step + 1
+            padding = torch.full(
+                (batch_size, padding_size),
+                tokenizer.pad_token_id,
+                dtype=last_predictions.dtype,
+                device=last_predictions.device,
+            )
+            last_predictions = torch.cat([padding, last_predictions], dim=-1)
+
+        decoder_cache = None
+        decoder_cache_dict = {
+            k: (state[k].contiguous() if state[k] is not None else None)
+            for k in state
+            if k not in {"input_ids", "input_mask", "encoder_states"}
+        }
+        if len(decoder_cache_dict) != 0:
+            decoder_cache = _dict_to_decoder_cache(decoder_cache_dict)
+
+        log_probabilities = None
+        for i in range(padding_size, last_predictions.shape[1]):
+            encoder_outputs = (
+                (state["encoder_states"],) if state["encoder_states"] is not None else None
+            )
+            outputs = model(
+                source_tokens = {
+                    'token_ids': state["input_ids"],
+                    'mask': state["input_mask"],
+                },
+                target_tokens = {
+                    'token_ids': last_predictions[:, : i + 1],
+                    'mask': state["input_mask"],
+                }
+            )
+
+            decoder_log_probabilities = F.log_softmax(outputs[:, 0], dim=-1)
+
+            if log_probabilities is None:
+                log_probabilities = decoder_log_probabilities
+            else:
+                idx = last_predictions[:, i].view(-1, 1)
+                log_probabilities = decoder_log_probabilities + log_probabilities.gather(
+                    dim=-1, index=idx
+                )
+
+            decoder_cache = outputs[1]
+
+            state["encoder_states"] = outputs[2]
+
+        if decoder_cache is not None:
+            decoder_cache_dict = _decoder_cache_to_dict(decoder_cache)
+            state.update(decoder_cache_dict)
+
+        return log_probabilities, state
 
 
-    def predit_fn(source_inputs: torch.Tensor, states: torch.Tensor):
         batch_size = source_inputs.size(0)
         source_list = [source_inputs[i,:] for i in range(batch_size)]
         state_list = [states[i,:] for i in range(batch_size)]
@@ -104,8 +183,21 @@ if __name__ == "__main__":
 
         source_inputs = inputs['input_ids']
         batch_size = source_inputs.size(0)
-        init_states = torch.full((batch_size, 1), tokenizer.bos_token_id)
-        translation_ids = greedy_search.search(source_inputs, init_states, predit_fn)
+        
+        initial_decoder_ids = torch.tensor(
+                [[tokenizer.bos_token_id]],
+                dtype=source_inputs.dtype,
+                device=source_inputs.device,
+            ).repeat(batch_size, 1)
+
+        inital_state = {
+            "input_ids": source_inputs,
+            "input_mask": torch.ones(1, source_inputs.size(1)),
+            "encoder_states": None,
+        }
+
+
+        translation_ids = beam_search.search(initial_decoder_ids, inital_state, take_step)
 
         # translation_ids = greedy_search.search(output)
         print([tokenizer.decode(g, skip_special_tokens=True, clean_up_tokenization_spaces=False) for g in translation_ids[0]])

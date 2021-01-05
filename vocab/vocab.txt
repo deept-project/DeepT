@@ -102,8 +102,6 @@
 [CLS]
 [SEP]
 [MASK]
-[BOS]
-[EOS]
 <S>
 <T>
 !
