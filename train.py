@@ -1,6 +1,7 @@
 import pytorch_lightning as pl
 from pytorch_lightning.loggers import TensorBoardLogger
 from pytorch_lightning.callbacks import GPUStatsMonitor
+from pytorch_lightning.callbacks.early_stopping import EarlyStopping
 import torch
 import transformers
 
@@ -32,11 +33,18 @@ if __name__ == "__main__":
     # most basic trainer, uses good defaults (auto-tensorboard, checkpoints, logs, and more)
     # trainer = pl.Trainer(gpus=8) (if you have GPUs)
     gpu_stats = GPUStatsMonitor()
+    early_stop_callback = EarlyStopping(
+        monitor='val_loss',
+        min_delta=0.00,
+        patience=3,
+        verbose=False,
+        mode='min'
+    )
     logger = TensorBoardLogger('tb_logs', name='translation')
     trainer = pl.Trainer(
-        gpus=[0],
+        gpus=[1],
         # num_nodes=1,
-        max_epochs=10,
+        max_epochs=500,
         # accelerator='ddp',
         # plugins='ddp_sharded',
         amp_backend='native',
@@ -51,9 +59,9 @@ if __name__ == "__main__":
         accumulate_grad_batches=16,
         sync_batchnorm=True,
         checkpoint_callback=True,
-        resume_from_checkpoint=None,
+        resume_from_checkpoint="tb_logs/translation/version_0/checkpoints/epoch=1-step=3868.ckpt",
         logger=logger,
-        callbacks=[],
+        callbacks=[early_stop_callback],
         # profiler="simple",
     )
     # find the batch size
@@ -94,4 +102,14 @@ if __name__ == "__main__":
 
 
     # translation_ids = greedy_search.search(output)
-    print([tokenizer.decode(g, skip_special_tokens=True, clean_up_tokenization_spaces=False) for g in translation_ids[0]])
+    result = ''
+    tokens = tokenizer.convert_ids_to_tokens(translation_ids[0], skip_special_tokens=True)
+    for each_token in tokens:
+        if each_token == '[SEP]':
+            break
+        if not each_token.startswith('##'):
+            result += ' ' + each_token
+        else:
+            result += each_token[2:]
+
+    print(result)

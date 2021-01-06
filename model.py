@@ -187,7 +187,7 @@ class BartForMaskedLM(pl.LightningModule):
             ]
         )
         train_sampler = torch.utils.data.RandomSampler(
-            dataset, num_samples=len(dataset), replacement=True)
+            dataset, num_samples=len(dataset)//100, replacement=True)
 
         pad_fn_object = PadFunction(self.tokenizer.pad_token_id)
         train_loader = torch.utils.data.DataLoader(

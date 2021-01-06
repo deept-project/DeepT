@@ -46,7 +46,8 @@ class GreedySearch(DecodeStrategy):
     def search(self, source_inputs: torch.Tensor, init_states: torch.Tensor, predit_fn: Callable) -> Tuple[torch.Tensor, torch.Tensor]:
         # source_inputs: (batch_size, seq_len)
         batch_size = source_inputs.size(0)
-        seq_len = source_inputs.size(1)
+        max_seq_len = source_inputs.size(1) * 2
+        seq_len = 256 if max_seq_len > 256 else max_seq_len
         translation_ids = torch.full((batch_size, seq_len), self.pad_id)
 
         states = init_states
@@ -56,7 +57,7 @@ class GreedySearch(DecodeStrategy):
             # output: (batch_size, seq_len, vocab_size)
             max_prob, max_ids = torch.max(output, dim=2)
 
-            states = torch.cat((states, torch.unsqueeze(max_ids[:, i], dim=0)), dim=1)
+            states = torch.cat((states, torch.unsqueeze(max_ids[:, i], dim=1)), dim=1)
             translation_ids[:, i] = max_ids[:, i]
         print(translation_ids)
 

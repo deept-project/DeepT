@@ -53,9 +53,15 @@ class PadFunction(object):
         }
         return source_tokens, target_tokens
 
+def is_chinese(uchar):
+    if uchar >= u'\u4e00' and uchar <= u'\u9fa5':
+        return True
+    else:
+        return False
+
 if __name__ == "__main__":
-    checkpoint_path = 'tb_logs/translation/version_0/checkpoints/epoch=0-step=159521.ckpt'
-    onnx_filepath = 'model.onnx'
+    checkpoint_path = 'tb_logs/translation/version_1/checkpoints/epoch=22-step=43535.ckpt'
+    # onnx_filepath = 'model.onnx'
 
     tokenizer = transformers.BertTokenizerFast('./vocab/vocab.txt')
     setattr(tokenizer, "_bos_token", '[CLS]')
@@ -108,4 +114,21 @@ if __name__ == "__main__":
         translation_ids = greedy_search.search(source_inputs, init_states, predit_fn)
 
         # translation_ids = greedy_search.search(output)
-        print([tokenizer.decode(g, skip_special_tokens=True, clean_up_tokenization_spaces=False) for g in translation_ids[0]])
+        tokens = tokenizer.convert_ids_to_tokens(translation_ids[0], skip_special_tokens=False)
+        new_tokens = []
+        for each_token in tokens:
+            if each_token == '[SEP]':
+                break
+            new_tokens.append(each_token)
+        
+        result = ''
+        for each_token in new_tokens:
+            if any([is_chinese(c) for c in each_token]):
+                result += each_token
+            else:
+                if not each_token.startswith('##'):
+                    result += ' ' + each_token
+                else:
+                    result += each_token[2:]
+
+        print(result)
