@@ -5,6 +5,8 @@ import torch
 import transformers
 from translate import GreedySearch
 
+import glob
+
 
 class PadFunction(object):
     def __init__(self, pad_id=0):
@@ -60,10 +62,13 @@ def is_chinese(uchar):
         return False
 
 if __name__ == "__main__":
-    checkpoint_path = 'tb_logs/translation/version_1/checkpoints/epoch=22-step=43535.ckpt'
+    ckpts = glob.glob('./tb_logs/translation/version_*/checkpoints/*.ckpt')
+    ckpts = sorted(ckpts)
+    checkpoint_path = ckpts[-1]
+    print(f'Loading {checkpoint_path}...')
     # onnx_filepath = 'model.onnx'
 
-    tokenizer = transformers.BertTokenizerFast('./vocab/vocab.txt')
+    tokenizer = transformers.BertTokenizerFast('./vocab/vocab.txt', do_lower_case=False)
     setattr(tokenizer, "_bos_token", '[CLS]')
     setattr(tokenizer, "_eos_token", '[SEP]')
 

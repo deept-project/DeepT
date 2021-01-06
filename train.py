@@ -56,10 +56,10 @@ if __name__ == "__main__":
         flush_logs_every_n_steps=100,
         progress_bar_refresh_rate=1,
         val_check_interval=0.5,
-        accumulate_grad_batches=16,
+        accumulate_grad_batches=4,
         sync_batchnorm=True,
         checkpoint_callback=True,
-        resume_from_checkpoint="tb_logs/translation/version_0/checkpoints/epoch=1-step=3868.ckpt",
+        resume_from_checkpoint=None,
         logger=logger,
         callbacks=[early_stop_callback],
         # profiler="simple",
@@ -70,7 +70,7 @@ if __name__ == "__main__":
 
 
     # infer
-    tokenizer = transformers.BertTokenizerFast('./vocab/vocab.txt')
+    tokenizer = transformers.BertTokenizerFast('./vocab/vocab.txt', do_lower_case=False)
     setattr(tokenizer, "_bos_token", '[CLS]')
     setattr(tokenizer, "_eos_token", '[SEP]')
 

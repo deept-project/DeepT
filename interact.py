@@ -59,7 +59,7 @@ class PadFunction(object):
         return source_tokens, target_tokens
 
 if __name__ == "__main__":
-    checkpoint_path = 'tb_logs/translation/version_0/checkpoints/epoch=0-step=159521.ckpt'
+    checkpoint_path = 'tb_logs/translation/version_1/checkpoints/epoch=29-step=57080.ckpt'
 
     tokenizer = transformers.BertTokenizerFast('./vocab/vocab.txt')
     setattr(tokenizer, "_bos_token", '[CLS]')
