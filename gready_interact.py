@@ -7,6 +7,7 @@ from translate import GreedySearch
 
 import glob
 
+device='cpu'
 
 class PadFunction(object):
     def __init__(self, pad_id=0):
@@ -45,13 +46,13 @@ class PadFunction(object):
         trg_seqs, trg_lengths = self.merge(trg_seqs, pad_size)
 
         source_tokens = {
-            'token_ids': src_seqs.to('cuda'),
-            'mask': self.make_mask(src_seqs, src_lengths).to('cuda'),
+            'token_ids': src_seqs.to(device),
+            'mask': self.make_mask(src_seqs, src_lengths).to(device),
         }
 
         target_tokens = {
-            'token_ids': trg_seqs.to('cuda'),
-            'mask': self.make_mask(trg_seqs, trg_lengths).to('cuda'),
+            'token_ids': trg_seqs.to(device),
+            'mask': self.make_mask(trg_seqs, trg_lengths).to(device),
         }
         return source_tokens, target_tokens
 
@@ -68,7 +69,7 @@ if __name__ == "__main__":
     print(f'Loading {checkpoint_path}...')
     # onnx_filepath = 'model.onnx'
 
-    tokenizer = transformers.BertTokenizerFast('./vocab/vocab.txt', do_lower_case=False)
+    tokenizer = transformers.BertTokenizer('./vocab/vocab.txt', do_basic_tokenize=False)
     setattr(tokenizer, "_bos_token", '[CLS]')
     setattr(tokenizer, "_eos_token", '[SEP]')
 
@@ -84,7 +85,7 @@ if __name__ == "__main__":
         }
         )
 
-    model = model.to('cuda')
+    model = model.to(device)
 
     model.eval()
 
@@ -110,12 +111,12 @@ if __name__ == "__main__":
         text = input('请输入原文：')
         print("输入是：" + text)
         
-        inputs = tokenizer([text.strip()], max_length=512, truncation=True, return_tensors='pt') # , padding="max_length", truncation=True
+        inputs = tokenizer([text.strip()], max_length=512, truncation=True, return_tensors='np') # , padding="max_length", truncation=True
 
 
-        source_inputs = inputs['input_ids'].to('cuda')
+        source_inputs = torch.tensor(inputs['input_ids'], device=device)
         batch_size = source_inputs.size(0)
-        init_states = torch.full((batch_size, 1), tokenizer.bos_token_id).to('cuda')
+        init_states = torch.full((batch_size, 1), tokenizer.bos_token_id).to(device)
         translation_ids = greedy_search.search(source_inputs, init_states, predit_fn)
 
         # translation_ids = greedy_search.search(output)
@@ -128,12 +129,12 @@ if __name__ == "__main__":
         
         result = ''
         for each_token in new_tokens:
-            if any([is_chinese(c) for c in each_token]):
-                result += each_token
+            # if any([is_chinese(c) for c in each_token]):
+            #     result += each_token
+            # else:
+            if not each_token.startswith('##'):
+                result += ' ' + each_token
             else:
-                if not each_token.startswith('##'):
-                    result += ' ' + each_token
-                else:
-                    result += each_token[2:]
+                result += each_token[2:]
 
-        print(result)
+        print(result.lstrip())

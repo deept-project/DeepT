@@ -104,7 +104,7 @@ class TranslationTask(object):
 
 class TranslationService(object):
     def __init__(self):
-        self.tokenizer = transformers.BertTokenizerFast('./vocab/vocab.txt')
+        self.tokenizer = transformers.BertTokenizerFast('./vocab/vocab.txt', do_basic_tokenize=False)
         setattr(self.tokenizer, "_bos_token", '[CLS]')
         setattr(self.tokenizer, "_eos_token", '[SEP]')
 

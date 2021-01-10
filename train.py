@@ -70,7 +70,7 @@ if __name__ == "__main__":
 
 
     # infer
-    tokenizer = transformers.BertTokenizerFast('./vocab/vocab.txt', do_lower_case=False)
+    tokenizer = transformers.BertTokenizer('./vocab/vocab.txt', do_basic_tokenize=False)
     setattr(tokenizer, "_bos_token", '[CLS]')
     setattr(tokenizer, "_eos_token", '[SEP]')
 

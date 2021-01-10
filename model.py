@@ -63,7 +63,7 @@ class BartForMaskedLM(pl.LightningModule):
         self.learning_rate = 3e-5
         self.d_model = 1024
 
-        self.tokenizer = transformers.BertTokenizerFast('./vocab/vocab.txt', do_lower_case=False)
+        self.tokenizer = transformers.BertTokenizer('./vocab/vocab.txt', do_basic_tokenize=False)
         setattr(self.tokenizer, "_bos_token", '[CLS]')
         setattr(self.tokenizer, "_eos_token", '[SEP]')
 
@@ -186,6 +186,8 @@ class BartForMaskedLM(pl.LightningModule):
             'data/umcorpus.en', 'data/umcorpus.zh', tokenizer=self.tokenizer)
         news_commentary_dataset = TranslationLazyDataset(
             'data/news-commentary-v12.zh-en.en', 'data/news-commentary-v12.zh-en.zh', tokenizer=self.tokenizer)
+        ted_dataset = TranslationLazyDataset(
+            'data/ted_train_en-zh.raw.en', 'data/ted_train_en-zh.raw.zh', tokenizer=self.tokenizer)
 
         dataset = torch.utils.data.ConcatDataset(
             [
@@ -195,6 +197,7 @@ class BartForMaskedLM(pl.LightningModule):
                 MultiUN_en_zh_dataset,
                 umcorpus_dataset,
                 news_commentary_dataset,
+                ted_dataset,
             ]
         )
         train_sampler = torch.utils.data.RandomSampler(
