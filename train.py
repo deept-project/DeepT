@@ -42,7 +42,7 @@ if __name__ == "__main__":
     )
     logger = TensorBoardLogger('tb_logs', name='translation')
     trainer = pl.Trainer(
-        gpus=[1],
+        gpus=[0],
         # num_nodes=1,
         max_epochs=500,
         # accelerator='ddp',
@@ -55,11 +55,11 @@ if __name__ == "__main__":
         log_every_n_steps=10,
         flush_logs_every_n_steps=100,
         progress_bar_refresh_rate=1,
-        val_check_interval=0.5,
+        val_check_interval=1.0,
         accumulate_grad_batches=4,
         sync_batchnorm=True,
         checkpoint_callback=True,
-        resume_from_checkpoint=None,
+        resume_from_checkpoint="tb_logs/translation/version_4/checkpoints/epoch=15-step=136847.ckpt",
         logger=logger,
         callbacks=[early_stop_callback],
         # profiler="simple",

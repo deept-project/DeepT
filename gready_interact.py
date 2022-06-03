@@ -1,9 +1,10 @@
 
+from typing import List
 from model import BartForMaskedLM
 import pytorch_lightning as pl
 import torch
 import transformers
-from translate import GreedySearch
+from translate import GreedySearch, BeamSearch, BeamSearchSlow
 
 import glob
 
@@ -62,6 +63,18 @@ def is_chinese(uchar):
     else:
         return False
 
+def vector_to_text(tokenizer, vector):
+    result = ''
+    tokens = tokenizer.convert_ids_to_tokens(vector, skip_special_tokens=True)
+    for each_token in tokens:
+        if each_token == '[SEP]':
+            break
+        if not each_token.startswith('##'):
+            result += ' ' + each_token
+        else:
+            result += each_token[2:]
+    return result
+
 if __name__ == "__main__":
     ckpts = glob.glob('./tb_logs/translation/version_*/checkpoints/*.ckpt')
     ckpts = sorted(ckpts)
@@ -86,55 +99,39 @@ if __name__ == "__main__":
         )
 
     model = model.to(device)
-
     model.eval()
 
     # Generate Summary
-    greedy_search = GreedySearch(
+    greedy_search = BeamSearchSlow(
         pad_id=tokenizer.pad_token_id,
         bos_id=tokenizer.bos_token_id,
         eos_id=tokenizer.eos_token_id,
         min_length=1,
         max_length=512)
 
+    def predit_fn(source_inputs: List[torch.Tensor], states: List[torch.Tensor]):
+        batch_size = len(source_inputs)
 
-    def predit_fn(source_inputs: torch.Tensor, states: torch.Tensor):
-        batch_size = source_inputs.size(0)
-        source_list = [source_inputs[i,:] for i in range(batch_size)]
-        state_list = [states[i,:] for i in range(batch_size)]
-
-        batch = pad_fn_object(list(zip(source_list, state_list)))
+        batch = pad_fn_object(list(zip(source_inputs, states)))
         output = model(source_tokens=batch[0], target_tokens=batch[1])
         return output
 
     while True:
-        text = input('请输入原文：')
-        print("输入是：" + text)
-        
-        inputs = tokenizer([text.strip()], max_length=512, truncation=True, return_tensors='np') # , padding="max_length", truncation=True
+        # text = input('请输入原文：')
+        # print("输入是：" + text)
 
+        # inputs = tokenizer([text.strip()], max_length=512, truncation=True, padding=True, return_tensors='pt')
 
-        source_inputs = torch.tensor(inputs['input_ids'], device=device)
+        inputs = tokenizer(["hello", "print"], max_length=512, truncation=True, padding=True, return_tensors='pt')
+
+        source_inputs = inputs['input_ids']
         batch_size = source_inputs.size(0)
         init_states = torch.full((batch_size, 1), tokenizer.bos_token_id).to(device)
         translation_ids = greedy_search.search(source_inputs, init_states, predit_fn)
 
         # translation_ids = greedy_search.search(output)
-        tokens = tokenizer.convert_ids_to_tokens(translation_ids[0], skip_special_tokens=False)
-        new_tokens = []
-        for each_token in tokens:
-            if each_token == '[SEP]':
-                break
-            new_tokens.append(each_token)
         
-        result = ''
-        for each_token in new_tokens:
-            # if any([is_chinese(c) for c in each_token]):
-            #     result += each_token
-            # else:
-            if not each_token.startswith('##'):
-                result += ' ' + each_token
-            else:
-                result += each_token[2:]
-
-        print(result.lstrip())
+        for i in range(batch_size):
+            translation = vector_to_text(tokenizer, translation_ids[i])
+            print(f'{i+1}/{batch_size}:\n{translation}')
+        break
