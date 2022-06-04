@@ -8,11 +8,11 @@ from enum import Enum
 import threading
 
 import transformers
-from translate import GreedySearch
+from deept.tranalate.translate import GreedySearch
 
 from flask import Flask
 
-from model import BartForMaskedLM
+from deept.model.mbart import BartForMaskedLM
 
 app = Flask(__name__)
 
@@ -104,9 +104,9 @@ class TranslationTask(object):
 
 class TranslationService(object):
     def __init__(self):
-        self.tokenizer = transformers.BertTokenizerFast('./vocab/vocab.txt', do_basic_tokenize=False)
-        setattr(self.tokenizer, "_bos_token", '[CLS]')
-        setattr(self.tokenizer, "_eos_token", '[SEP]')
+        self.tokenizer = transformers.MBart50Tokenizer.from_pretrained("facebook/mbart-large-50-many-to-many-mmt")
+        # setattr(self.tokenizer, "_bos_token", '[CLS]')
+        # setattr(self.tokenizer, "_eos_token", '[SEP]')
 
         self.model = BartForMaskedLM.load_from_checkpoint('tb_logs/translation/version_1/checkpoints/epoch=24-step=48372.ckpt')
         self.model = self.model.to('cuda')

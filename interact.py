@@ -1,5 +1,5 @@
 
-from model import BartForMaskedLM
+from deept.model.mbart import BartForMaskedLM
 import pytorch_lightning as pl
 import torch
 import torch.nn.functional as F
@@ -61,7 +61,7 @@ class PadFunction(object):
 if __name__ == "__main__":
     checkpoint_path = 'tb_logs/translation/version_1/checkpoints/epoch=29-step=57080.ckpt'
 
-    tokenizer = transformers.BertTokenizerFast('./vocab/vocab.txt')
+    tokenizer = transformers.MBart50Tokenizer.from_pretrained("facebook/mbart-large-50-many-to-many-mmt")
     setattr(tokenizer, "_bos_token", '[CLS]')
     setattr(tokenizer, "_eos_token", '[SEP]')
 

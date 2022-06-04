@@ -31,7 +31,7 @@ class TranslationDataset(torch.utils.data.Dataset):
         self.target_ids_path = target_path + '.npz'
         # tokenizer
         if tokenizer is None:
-            self.tokenizer = transformers.BertTokenizerFast.from_pretrained('bert-base-multilingual-cased')
+            self.tokenizer = transformers.MBart50Tokenizer.from_pretrained("facebook/mbart-large-50-many-to-many-mmt")
         else:
             self.tokenizer = tokenizer
         self.max_length = 512
@@ -92,7 +92,7 @@ class TranslationLazyDataset(torch.utils.data.Dataset):
 
         # tokenizer
         if tokenizer is None:
-            self.tokenizer = transformers.BertTokenizerFast.from_pretrained('bert-base-multilingual-cased')
+            self.tokenizer = transformers.MBart50Tokenizer.from_pretrained("facebook/mbart-large-50-many-to-many-mmt")
         else:
             self.tokenizer = tokenizer
         self.max_length = 512

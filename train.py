@@ -5,12 +5,12 @@ from pytorch_lightning.callbacks.early_stopping import EarlyStopping
 import torch
 import transformers
 
-from model import BartForMaskedLM, PadFunction
+from deept.model.mbart import BartForMaskedLM, PadFunction
 import torch
 import tqdm
 import numpy as np
 
-from translate import GreedySearch
+from deept.tranalate.translate import GreedySearch
 
 import random
 import os
@@ -70,9 +70,9 @@ if __name__ == "__main__":
 
 
     # infer
-    tokenizer = transformers.BertTokenizer('./vocab/vocab.txt', do_basic_tokenize=False)
-    setattr(tokenizer, "_bos_token", '[CLS]')
-    setattr(tokenizer, "_eos_token", '[SEP]')
+    tokenizer = transformers.MBart50Tokenizer.from_pretrained("facebook/mbart-large-50-many-to-many-mmt")
+    # setattr(tokenizer, "_bos_token", '[CLS]')
+    # setattr(tokenizer, "_eos_token", '[SEP]')
 
     inputs = tokenizer(["XiaHuan is a C++ expert."], max_length=512, truncation=True, return_tensors='pt') # , padding="max_length", truncation=True
 

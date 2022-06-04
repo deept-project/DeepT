@@ -26,7 +26,7 @@ class BeamNode(object):
             return
         if self.seq.size(-1) >= self.max_length:
             token = self.eos_id
-        self.seq = torch.cat([self.seq, torch.full((1,), token, dtype=torch.long)])
+        self.seq = torch.cat([self.seq, torch.full((1,), token, dtype=torch.long, device=self.seq.device)])
         self.log_prob += math.log(prob)
         if token == self.eos_id:
             self.finished = True
@@ -36,7 +36,12 @@ class BeamNode(object):
         node.log_prob = self.log_prob
         node.finished = self.finished
         return node
+    
+    def length(self):
+        return self.seq.size(-1)
 
+    def mean_log_prob(self):
+        return self.log_prob / self.length()
 
 class BeamSearchSlow(DecodeStrategy):
     def __init__(self, pad_id, bos_id, eos_id, min_length, max_length, top_k=3):
@@ -46,11 +51,11 @@ class BeamSearchSlow(DecodeStrategy):
     def search_one_batch(self, source_inputs: torch.Tensor, init_state: torch.Tensor, predit_fn: Callable):
         ret = [None] * self.top_k
         seq_len = 0
-        source_inputs = [source_inputs.clone() for i in range(self.top_k)]
-        k_states = [BeamNode(0, init_state.clone(), self.eos_id, 16) for i in range(self.top_k)]
+        k_states = [BeamNode(0, init_state.clone(), self.eos_id, self.max_length)]
         while any([not item.finished for item in k_states]):
             input_seqs, input_states = zip(*[(s.seq, s) for s in k_states if not s.finished])
-            output = predit_fn(source_inputs, input_seqs)
+            source_seqs = [source_inputs.clone() for i in range(len(input_states))]
+            output = predit_fn(source_seqs, input_seqs)
             output = output.detach()
             # output: (batch_size, seq_len, vocab_size)
             top_prob, top_ids = torch.topk(output, self.top_k, dim=2)
@@ -59,17 +64,17 @@ class BeamSearchSlow(DecodeStrategy):
             for i in range(len(input_states)):
                 for k in range(self.top_k):
                     new_token = top_ids[i, seq_len, k]
+                    new_prob = top_prob[i, seq_len, k]
                     input_state = input_states[i].clone()
+                    input_state.add_token(new_token, new_prob)
                     new_states.append(input_state)
-                    if not input_state.finished:
-                        input_state.add_token(new_token, top_prob[i, seq_len, k])
 
-            new_states = sorted(new_states, key=lambda x: x.log_prob, reverse=True)
+            new_states = sorted(new_states, key=lambda x: x.mean_log_prob(), reverse=True)
             k_states = new_states[:self.top_k]
 
             seq_len += 1
         ret = k_states
-        ret = sorted(ret, key=lambda x: x.log_prob, reverse=True)
+        ret = sorted(ret, key=lambda x: x.mean_log_prob(), reverse=True)
         return ret[0].seq
 
     def search(self, source_inputs: torch.Tensor, init_states: torch.Tensor, predit_fn: Callable): #  -> Tuple[torch.Tensor, torch.Tensor]:

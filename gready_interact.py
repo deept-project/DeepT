@@ -1,10 +1,10 @@
 
 from typing import List
-from model import BartForMaskedLM
+from deept.model.mbart import BartForMaskedLM
 import pytorch_lightning as pl
 import torch
 import transformers
-from translate import GreedySearch, BeamSearch, BeamSearchSlow
+from deept.tranalate.translate import GreedySearch, BeamSearch, BeamSearchSlow
 
 import glob
 
@@ -82,9 +82,9 @@ if __name__ == "__main__":
     print(f'Loading {checkpoint_path}...')
     # onnx_filepath = 'model.onnx'
 
-    tokenizer = transformers.BertTokenizer('./vocab/vocab.txt', do_basic_tokenize=False)
-    setattr(tokenizer, "_bos_token", '[CLS]')
-    setattr(tokenizer, "_eos_token", '[SEP]')
+    tokenizer = transformers.MBart50Tokenizer.from_pretrained("facebook/mbart-large-50-many-to-many-mmt")
+    # setattr(tokenizer, "_bos_token", '[CLS]')
+    # setattr(tokenizer, "_eos_token", '[SEP]')
 
     pad_fn_object = PadFunction(tokenizer.pad_token_id)
 
@@ -96,7 +96,7 @@ if __name__ == "__main__":
             'eos_token_id': tokenizer.eos_token_id,
             'pad_token_id': tokenizer.pad_token_id,
         }
-        )
+    )
 
     model = model.to(device)
     model.eval()
@@ -107,7 +107,7 @@ if __name__ == "__main__":
         bos_id=tokenizer.bos_token_id,
         eos_id=tokenizer.eos_token_id,
         min_length=1,
-        max_length=512)
+        max_length=64)
 
     def predit_fn(source_inputs: List[torch.Tensor], states: List[torch.Tensor]):
         batch_size = len(source_inputs)
@@ -122,7 +122,8 @@ if __name__ == "__main__":
 
         # inputs = tokenizer([text.strip()], max_length=512, truncation=True, padding=True, return_tensors='pt')
 
-        inputs = tokenizer(["hello", "print"], max_length=512, truncation=True, padding=True, return_tensors='pt')
+        texts = ["hello world", "Also, note that the copy mechanism is only applied to the raw dataset of source code tokens."]
+        inputs = tokenizer(texts, max_length=512, truncation=True, padding=True, return_tensors='pt')
 
         source_inputs = inputs['input_ids']
         batch_size = source_inputs.size(0)
