@@ -9,11 +9,11 @@ class BartForMaskedLM(pl.LightningModule):
     def __init__(self):
         super().__init__()
 
-        self.batch_size = 8
+        self.batch_size = 4
         self.learning_rate = 3e-5
         self.d_model = 1024
 
-        self.tokenizer = transformers.MBart50Tokenizer.from_pretrained("facebook/mbart-large-50-many-to-many-mmt")
+        self.tokenizer = transformers.MBart50TokenizerFast.from_pretrained("facebook/mbart-large-50-many-to-many-mmt")
         # setattr(self.tokenizer, "_bos_token", '[CLS]')
         # setattr(self.tokenizer, "_eos_token", '[SEP]')
 
@@ -143,14 +143,12 @@ class BartForMaskedLM(pl.LightningModule):
             dataset, num_samples=len(dataset)//100, replacement=True)
 
         pad_fn_object = PadFunction(self.tokenizer.pad_token_id)
-        train_loader = torch.utils.data.DataLoader(
-            dataset, num_workers=8, batch_size=self.batch_size, collate_fn=pad_fn_object, sampler=train_sampler, pin_memory=True)
+        train_loader = torch.utils.data.DataLoader(dataset, num_workers=8, batch_size=self.batch_size, collate_fn=pad_fn_object, sampler=train_sampler, pin_memory=True)
 
         return train_loader
 
     def val_dataloader(self):
-        translation2019zh_valid_dataset = TranslationLazyDataset(
-            'data/translation2019zh_valid.en', 'data/translation2019zh_valid.zh', tokenizer=self.tokenizer)
+        translation2019zh_valid_dataset = TranslationLazyDataset('data/translation2019zh_valid.en', 'data/translation2019zh_valid.zh', tokenizer=self.tokenizer)
 
         valid_dataset = translation2019zh_valid_dataset
 

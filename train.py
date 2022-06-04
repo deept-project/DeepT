@@ -1,3 +1,4 @@
+from typing import List
 import pytorch_lightning as pl
 from pytorch_lightning.loggers import TensorBoardLogger
 from pytorch_lightning.callbacks import GPUStatsMonitor
@@ -48,7 +49,6 @@ if __name__ == "__main__":
         # accelerator='ddp',
         # plugins='ddp_sharded',
         amp_backend='native',
-        amp_level='O2',
         precision=16,
         auto_scale_batch_size=None,
         log_gpu_memory=None,
@@ -59,7 +59,7 @@ if __name__ == "__main__":
         accumulate_grad_batches=4,
         sync_batchnorm=True,
         checkpoint_callback=True,
-        resume_from_checkpoint="tb_logs/translation/version_4/checkpoints/epoch=15-step=136847.ckpt",
+        # resume_from_checkpoint="tb_logs/translation/version_4/checkpoints/epoch=15-step=136847.ckpt",
         logger=logger,
         callbacks=[early_stop_callback],
         # profiler="simple",
@@ -86,13 +86,11 @@ if __name__ == "__main__":
 
     pad_fn_object = PadFunction(tokenizer.pad_token_id)
 
-    def predit_fn(source_inputs: torch.Tensor, states: torch.Tensor):
-        batch_size = source_inputs.size(0)
-        source_list = [source_inputs[i,:] for i in range(batch_size)]
-        state_list = [states[i,:] for i in range(batch_size)]
+    def predit_fn(source_inputs: List[torch.Tensor], states: List[torch.Tensor]):
+        batch_size = len(source_inputs)
 
-        batch = pad_fn_object(list(zip(source_list, state_list)))
-        output = model(*batch)
+        batch = pad_fn_object(list(zip(source_inputs, states)))
+        output = model(source_tokens=batch[0], target_tokens=batch[1])
         return output
 
     source_inputs = inputs['input_ids']

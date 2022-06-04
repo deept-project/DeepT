@@ -5,57 +5,11 @@ import pytorch_lightning as pl
 import torch
 import transformers
 from deept.tranalate.translate import GreedySearch, BeamSearch, BeamSearchSlow
+from deept.utils import PadFunction
 
 import glob
 
-device='cpu'
-
-class PadFunction(object):
-    def __init__(self, pad_id=0):
-        self.pad_id = pad_id
-
-    def __call__(self, batch):
-        return self._pad_fn(batch)
-
-    def merge(self, sequences, pad_size=None):
-        lengths = [len(seq) for seq in sequences]
-        if pad_size is None:
-            pad_size = max(lengths)
-        padded_seqs = torch.full((len(sequences), pad_size), self.pad_id).long()
-        for i, seq in enumerate(sequences):
-            end = lengths[i]
-            padded_seqs[i, :end] = seq[:end]
-        return padded_seqs, lengths
-
-    def make_mask(self, inputs, inputs_length):
-        inputs_mask = torch.zeros_like(inputs)
-        for i in range(inputs_mask.size(0)):
-            inputs_mask[i,:inputs_length[i]] = 1
-        return inputs_mask
-
-    def _pad_fn(self, batch):
-        # sort a list by sequence length (descending order) to use pack_padded_sequence
-        batch.sort(key=lambda x: len(x[0]), reverse=True)
-
-        # seperate source and target sequences
-        src_seqs, trg_seqs = zip(*batch)
-
-        # merge sequences (from tuple of 1D tensor to 2D tensor)
-        # pad_size = max([len(seq) for seq in src_seqs] + [len(seq) for seq in trg_seqs])
-        pad_size=None
-        src_seqs, src_lengths = self.merge(src_seqs, pad_size)
-        trg_seqs, trg_lengths = self.merge(trg_seqs, pad_size)
-
-        source_tokens = {
-            'token_ids': src_seqs.to(device),
-            'mask': self.make_mask(src_seqs, src_lengths).to(device),
-        }
-
-        target_tokens = {
-            'token_ids': trg_seqs.to(device),
-            'mask': self.make_mask(trg_seqs, trg_lengths).to(device),
-        }
-        return source_tokens, target_tokens
+device='cuda'
 
 def is_chinese(uchar):
     if uchar >= u'\u4e00' and uchar <= u'\u9fa5':
@@ -125,7 +79,7 @@ if __name__ == "__main__":
         texts = ["hello world", "Also, note that the copy mechanism is only applied to the raw dataset of source code tokens."]
         inputs = tokenizer(texts, max_length=512, truncation=True, padding=True, return_tensors='pt')
 
-        source_inputs = inputs['input_ids']
+        source_inputs = inputs['input_ids'].to(device)
         batch_size = source_inputs.size(0)
         init_states = torch.full((batch_size, 1), tokenizer.bos_token_id).to(device)
         translation_ids = greedy_search.search(source_inputs, init_states, predit_fn)
