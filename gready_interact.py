@@ -17,11 +17,11 @@ def is_chinese(uchar):
     else:
         return False
 
-def vector_to_text(tokenizer, vector):
+def vector_to_text(tokenizer:transformers.tokenization_utils.PreTrainedTokenizer, vector):
     result = ''
     tokens = tokenizer.convert_ids_to_tokens(vector, skip_special_tokens=True)
     for each_token in tokens:
-        if each_token == '[SEP]':
+        if each_token == tokenizer.eos_token:
             break
         if not each_token.startswith('##'):
             result += ' ' + each_token
@@ -42,6 +42,8 @@ if __name__ == "__main__":
 
     pad_fn_object = PadFunction(tokenizer.pad_token_id)
 
+    bos_token_id = tokenizer.lang_code_to_id["en_XX"]
+
     model = BartForMaskedLM.load_from_checkpoint(
         checkpoint_path,
         config={
@@ -54,6 +56,8 @@ if __name__ == "__main__":
 
     model = model.to(device)
     model.eval()
+
+    # tokenizer.lang_code_to_id["fr_XX"]
 
     # Generate Summary
     greedy_search = BeamSearchSlow(
@@ -71,17 +75,17 @@ if __name__ == "__main__":
         return output
 
     while True:
-        # text = input('请输入原文：')
-        # print("输入是：" + text)
+        text = input('请输入原文：')
+        print("输入是：" + text)
 
-        # inputs = tokenizer([text.strip()], max_length=512, truncation=True, padding=True, return_tensors='pt')
+        inputs = tokenizer([text.strip()], max_length=512, truncation=True, padding=True, return_tensors='pt')
 
-        texts = ["hello world", "Also, note that the copy mechanism is only applied to the raw dataset of source code tokens."]
-        inputs = tokenizer(texts, max_length=512, truncation=True, padding=True, return_tensors='pt')
+        # texts = ["hello world", "Also, note that the copy mechanism is only applied to the raw dataset of source code tokens."]
+        # inputs = tokenizer(texts, max_length=512, truncation=True, padding=True, return_tensors='pt')
 
         source_inputs = inputs['input_ids'].to(device)
         batch_size = source_inputs.size(0)
-        init_states = torch.full((batch_size, 1), tokenizer.bos_token_id).to(device)
+        init_states = torch.full((batch_size, 1), bos_token_id).to(device)
         translation_ids = greedy_search.search(source_inputs, init_states, predit_fn)
 
         # translation_ids = greedy_search.search(output)
@@ -89,4 +93,3 @@ if __name__ == "__main__":
         for i in range(batch_size):
             translation = vector_to_text(tokenizer, translation_ids[i])
             print(f'{i+1}/{batch_size}:\n{translation}')
-        break

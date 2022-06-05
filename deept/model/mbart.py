@@ -13,7 +13,7 @@ class BartForMaskedLM(pl.LightningModule):
         self.learning_rate = 3e-5
         self.d_model = 1024
 
-        self.tokenizer = transformers.MBart50TokenizerFast.from_pretrained("facebook/mbart-large-50-many-to-many-mmt")
+        self.tokenizer = transformers.MBart50TokenizerFast.from_pretrained("facebook/mbart-large-50-many-to-many-mmt", src_lang="en_XX", tgt_lang="zh_CN")
         # setattr(self.tokenizer, "_bos_token", '[CLS]')
         # setattr(self.tokenizer, "_eos_token", '[SEP]')
 
@@ -26,7 +26,6 @@ class BartForMaskedLM(pl.LightningModule):
         self.transformer = transformers.MBartModel.from_pretrained("facebook/mbart-large-50-many-to-many-mmt")
         self.lm_head = torch.nn.Linear(self.d_model, self.vocab_size, bias=False)
 
-    # @profile
     def forward(self, source_tokens, target_tokens):
         inputs, labels = source_tokens, target_tokens
 
@@ -50,7 +49,6 @@ class BartForMaskedLM(pl.LightningModule):
 
         return lm_logits
 
-    # @profile
     def training_step(self, batch, batch_idx):
         # training_step defined the train loop.
         # It is independent of forward
@@ -104,8 +102,7 @@ class BartForMaskedLM(pl.LightningModule):
         shift_label_ids = label_ids[..., 1:].contiguous()
 
         loss_fct = torch.nn.CrossEntropyLoss(ignore_index=self.pad_token_id)
-        loss = loss_fct(lm_logits.view(-1, self.vocab_size),
-                        shift_label_ids.view(-1))
+        loss = loss_fct(lm_logits.view(-1, self.vocab_size), shift_label_ids.view(-1))
         self.log('val_loss', loss)
 
     def configure_optimizers(self):
@@ -113,20 +110,13 @@ class BartForMaskedLM(pl.LightningModule):
         return optimizer
 
     def train_dataloader(self):
-        ai_challenger_2017_dataset = TranslationLazyDataset(
-            'data/ai_challenger_2017_train.en', 'data/ai_challenger_2017_train.zh', tokenizer=self.tokenizer)
-        minecraft_dataset = TranslationLazyDataset(
-            'data/minecraft.en', 'data/minecraft.zh', tokenizer=self.tokenizer)
-        translation2019zh_dataset = TranslationLazyDataset(
-            'data/translation2019zh_train.en', 'data/translation2019zh_train.zh', tokenizer=self.tokenizer)
-        MultiUN_en_zh_dataset = TranslationLazyDataset(
-            'data/MultiUN.en-zh.en', 'data/MultiUN.en-zh.zh', tokenizer=self.tokenizer)
-        umcorpus_dataset = TranslationLazyDataset(
-            'data/umcorpus.en', 'data/umcorpus.zh', tokenizer=self.tokenizer)
-        news_commentary_dataset = TranslationLazyDataset(
-            'data/news-commentary-v12.zh-en.en', 'data/news-commentary-v12.zh-en.zh', tokenizer=self.tokenizer)
-        ted_dataset = TranslationLazyDataset(
-            'data/ted_train_en-zh.raw.en', 'data/ted_train_en-zh.raw.zh', tokenizer=self.tokenizer)
+        ai_challenger_2017_dataset = TranslationLazyDataset('data/ai_challenger_2017_train.en', 'data/ai_challenger_2017_train.zh', tokenizer=self.tokenizer)
+        minecraft_dataset = TranslationLazyDataset('data/minecraft.en', 'data/minecraft.zh', tokenizer=self.tokenizer)
+        translation2019zh_dataset = TranslationLazyDataset('data/translation2019zh_train.en', 'data/translation2019zh_train.zh', tokenizer=self.tokenizer)
+        MultiUN_en_zh_dataset = TranslationLazyDataset('data/MultiUN.en-zh.en', 'data/MultiUN.en-zh.zh', tokenizer=self.tokenizer)
+        umcorpus_dataset = TranslationLazyDataset('data/umcorpus.en', 'data/umcorpus.zh', tokenizer=self.tokenizer)
+        news_commentary_dataset = TranslationLazyDataset('data/news-commentary-v12.zh-en.en', 'data/news-commentary-v12.zh-en.zh', tokenizer=self.tokenizer)
+        ted_dataset = TranslationLazyDataset('data/ted_train_en-zh.raw.en', 'data/ted_train_en-zh.raw.zh', tokenizer=self.tokenizer)
 
         dataset = torch.utils.data.ConcatDataset(
             [
