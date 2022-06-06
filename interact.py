@@ -19,15 +19,13 @@ def is_chinese(uchar):
         return False
 
 def vector_to_text(tokenizer:transformers.tokenization_utils.PreTrainedTokenizer, vector):
+    return tokenizer.decode(vector, skip_special_tokens=True)
     result = ''
-    tokens = tokenizer.convert_ids_to_tokens(vector, skip_special_tokens=True)
+    tokens = tokenizer.convert_ids_to_tokens(vector, skip_special_tokens=False)
     for each_token in tokens:
         if each_token == tokenizer.eos_token:
             break
-        if not each_token.startswith('##'):
-            result += ' ' + each_token
-        else:
-            result += each_token[2:]
+        result += each_token
     return result
 
 if __name__ == "__main__":

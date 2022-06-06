@@ -14,15 +14,11 @@ class BartForMaskedLM(pl.LightningModule):
         self.learning_rate = 3e-5
         self.d_model = 1024
 
-        self.tokenizer = transformers.MBart50TokenizerFast.from_pretrained("facebook/mbart-large-50-many-to-many-mmt", src_lang="en_XX", tgt_lang="zh_CN")
-        # setattr(self.tokenizer, "_bos_token", '[CLS]')
-        # setattr(self.tokenizer, "_eos_token", '[SEP]')
+        self.tokenizer_en_XX_to_zh_CN = transformers.MBart50TokenizerFast.from_pretrained("facebook/mbart-large-50-many-to-many-mmt", src_lang="en_XX", tgt_lang="zh_CN")
+        self.tokenizer_zh_CN_to_en_XX= transformers.MBart50TokenizerFast.from_pretrained("facebook/mbart-large-50-many-to-many-mmt", src_lang="zh_CN", tgt_lang="en_XX")
 
-        self.bos_token_id = self.tokenizer.bos_token_id
-        self.eos_token_id = self.tokenizer.eos_token_id
-        self.pad_token_id = self.tokenizer.pad_token_id
-
-        self.vocab_size = self.tokenizer.vocab_size
+        self.pad_token_id = self.tokenizer_en_XX_to_zh_CN.pad_token_id
+        self.vocab_size = 250054 # self.tokenizer.vocab_size
 
         self.transformer = transformers.MBartModel.from_pretrained("facebook/mbart-large-50-many-to-many-mmt")
         self.lm_head = torch.nn.Linear(self.d_model, self.vocab_size, bias=False)
@@ -110,13 +106,13 @@ class BartForMaskedLM(pl.LightningModule):
         return optimizer
 
     def train_dataloader(self):
-        ai_challenger_2017_dataset = TranslationLazyDataset('data/ai_challenger_2017_train.en', 'data/ai_challenger_2017_train.zh', tokenizer=self.tokenizer)
-        minecraft_dataset = TranslationLazyDataset('data/minecraft.en', 'data/minecraft.zh', tokenizer=self.tokenizer)
-        translation2019zh_dataset = TranslationLazyDataset('data/translation2019zh_train.en', 'data/translation2019zh_train.zh', tokenizer=self.tokenizer)
-        MultiUN_en_zh_dataset = TranslationLazyDataset('data/MultiUN.en-zh.en', 'data/MultiUN.en-zh.zh', tokenizer=self.tokenizer)
-        umcorpus_dataset = TranslationLazyDataset('data/umcorpus.en', 'data/umcorpus.zh', tokenizer=self.tokenizer)
-        news_commentary_dataset = TranslationLazyDataset('data/news-commentary-v12.zh-en.en', 'data/news-commentary-v12.zh-en.zh', tokenizer=self.tokenizer)
-        ted_dataset = TranslationLazyDataset('data/ted_train_en-zh.raw.en', 'data/ted_train_en-zh.raw.zh', tokenizer=self.tokenizer)
+        ai_challenger_2017_dataset = TranslationLazyDataset('data/ai_challenger_2017_train.en', 'data/ai_challenger_2017_train.zh', tokenizer=self.tokenizer_en_XX_to_zh_CN)
+        minecraft_dataset = TranslationLazyDataset('data/minecraft.en', 'data/minecraft.zh', tokenizer=self.tokenizer_en_XX_to_zh_CN)
+        translation2019zh_dataset = TranslationLazyDataset('data/translation2019zh_train.en', 'data/translation2019zh_train.zh', tokenizer=self.tokenizer_en_XX_to_zh_CN)
+        MultiUN_en_zh_dataset = TranslationLazyDataset('data/MultiUN.en-zh.en', 'data/MultiUN.en-zh.zh', tokenizer=self.tokenizer_en_XX_to_zh_CN)
+        umcorpus_dataset = TranslationLazyDataset('data/umcorpus.en', 'data/umcorpus.zh', tokenizer=self.tokenizer_en_XX_to_zh_CN)
+        news_commentary_dataset = TranslationLazyDataset('data/news-commentary-v12.zh-en.en', 'data/news-commentary-v12.zh-en.zh', tokenizer=self.tokenizer_en_XX_to_zh_CN)
+        ted_dataset = TranslationLazyDataset('data/ted_train_en-zh.raw.en', 'data/ted_train_en-zh.raw.zh', tokenizer=self.tokenizer_en_XX_to_zh_CN)
 
         dataset = torch.utils.data.ConcatDataset(
             [
@@ -131,19 +127,19 @@ class BartForMaskedLM(pl.LightningModule):
         )
         train_sampler = torch.utils.data.RandomSampler(dataset, num_samples=len(dataset)//100, replacement=True)
 
-        pad_fn_object = PadFunction(self.tokenizer.pad_token_id)
+        pad_fn_object = PadFunction(self.pad_token_id)
         train_loader = torch.utils.data.DataLoader(dataset, num_workers=8, batch_size=self.batch_size, collate_fn=pad_fn_object, sampler=train_sampler, pin_memory=True)
 
         return train_loader
 
     def val_dataloader(self):
-        translation2019zh_valid_dataset = TranslationLazyDataset('data/translation2019zh_valid.en', 'data/translation2019zh_valid.zh', tokenizer=self.tokenizer)
+        translation2019zh_valid_dataset = TranslationLazyDataset('data/translation2019zh_valid.en', 'data/translation2019zh_valid.zh', tokenizer=self.tokenizer_en_XX_to_zh_CN)
 
         valid_dataset = translation2019zh_valid_dataset
 
         valid_sampler = torch.utils.data.SequentialSampler(valid_dataset)
 
-        pad_fn_object = PadFunction(self.tokenizer.pad_token_id)
+        pad_fn_object = PadFunction(self.pad_token_id)
         valid_loader = torch.utils.data.DataLoader(valid_dataset, num_workers=4, batch_size=self.batch_size, collate_fn=pad_fn_object, sampler=valid_sampler, pin_memory=True)
 
         return valid_loader

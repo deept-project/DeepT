@@ -1,6 +1,6 @@
 import math
 import torch
-from .beam_scorer import MeanLogProbScorer, MeanLogProbWithLengthPenaltyScorer
+from .beam_scorer import MeanLogProbScorer, MeanLogProbWithLengthPenaltyScorer, MeanLogProbWithRepetitionPenaltyScorer
 
 class BeamNode(object):
     def __init__(self, batch_idx: int, seq: torch.Tensor, eos_id: int, max_length: int):
@@ -9,7 +9,7 @@ class BeamNode(object):
         self.eos_id = eos_id
         self.max_length = max_length
         self.finished = False
-        self.scorer = MeanLogProbWithLengthPenaltyScorer()
+        self.scorer = MeanLogProbWithRepetitionPenaltyScorer()
 
     def add_token(self, token: int, prob: float):
         if self.finished:

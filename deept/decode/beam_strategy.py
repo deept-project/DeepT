@@ -47,7 +47,7 @@ def top_k_top_p_filtering(logits: torch.Tensor, top_k: int = 0, top_p: float = 1
 class BeamSearchSlow(DecodeStrategy):
     def __init__(self, pad_id: int, bos_id: int, eos_id: int,
                 min_length: int, max_length: int,
-                num_beams: int = 3, top_k: int = 5, top_p: float = 0.9
+                num_beams: int = 3, top_k: int = 50, top_p: float = 1.0
         ):
         super(BeamSearchSlow, self).__init__(pad_id, bos_id, eos_id, min_length, max_length)
         self.num_beams = num_beams
@@ -57,6 +57,7 @@ class BeamSearchSlow(DecodeStrategy):
     def search_one_batch(self, source_inputs: torch.Tensor, init_state: torch.Tensor, predit_fn: Callable):
         ret = [None] * self.num_beams
         seq_len = 0
+        finished_states = []
         k_states = [BeamNode(0, init_state.clone(), self.eos_id, self.max_length)]
         while any([not item.finished for item in k_states]):
             input_seqs, input_states = zip(*[(s.seq, s) for s in k_states if not s.finished])
@@ -74,18 +75,20 @@ class BeamSearchSlow(DecodeStrategy):
             new_states: List[BeamNode] = []
             for i in range(len(input_states)):
                 for k in range(self.num_beams):
-                    new_token = top_ids[i, seq_len, k]
-                    new_prob = top_prob[i, seq_len, k]
+                    new_token = top_ids[i, seq_len, k].item()
+                    new_prob = top_prob[i, seq_len, k].item()
                     input_state = input_states[i].clone()
                     input_state.add_token(new_token, new_prob)
                     new_states.append(input_state)
 
             new_states = sorted(new_states, key=lambda x: x.score(), reverse=True)
-            k_states = new_states[:self.num_beams]
+            top_new_states = new_states[:self.num_beams - len(finished_states)]
+            finished_states.extend([s for s in top_new_states if s.finished])
+            k_states = [s for s in top_new_states if not s.finished]
 
             seq_len += 1
-        ret = k_states
-        ret = sorted(ret, key=lambda x: x.score(), reverse=True)
+
+        ret = sorted(finished_states, key=lambda x: x.score(), reverse=True)
         return ret[0].seq
 
     def search(self, source_inputs: torch.Tensor, init_states: torch.Tensor, predit_fn: Callable): #  -> Tuple[torch.Tensor, torch.Tensor]:
@@ -98,7 +101,6 @@ class BeamSearchSlow(DecodeStrategy):
             ret.append(out)
 
         return ret
-
 
 class BeamSearch(DecodeStrategy):
     def __init__(self, pad_id, bos_id, eos_id, min_length, max_length, top_k=10):

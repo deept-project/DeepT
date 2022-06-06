@@ -56,14 +56,17 @@ class MeanLogProbWithLengthPenaltyScorer(BeamScorer):
         self.length = 0
 
     def clone(self):
-        scorer = MeanLogProbScorer()
+        scorer = MeanLogProbWithLengthPenaltyScorer()
+
+        scorer.length_penalty = self.length_penalty
+
         scorer.log_prob = self.log_prob
         scorer.length = self.length
         return scorer
 
 class MeanLogProbWithRepetitionPenaltyScorer(BeamScorer):
     def __init__(self):
-        super(MeanLogProbWithLengthPenaltyScorer, self).__init__()
+        super(MeanLogProbWithRepetitionPenaltyScorer, self).__init__()
         self.length_penalty = 0.7
         self.repetition_penalty = 0.9
 
@@ -89,7 +92,13 @@ class MeanLogProbWithRepetitionPenaltyScorer(BeamScorer):
         self.repetition_counter = 0
 
     def clone(self):
-        scorer = MeanLogProbScorer()
+        scorer = MeanLogProbWithRepetitionPenaltyScorer()
+        scorer.length_penalty = self.length_penalty
+        scorer.repetition_penalty = self.repetition_penalty
+
+        scorer.previous_tokens = self.previous_tokens.copy()
         scorer.log_prob = self.log_prob
         scorer.length = self.length
+        scorer.repetition_counter = self.repetition_counter
+
         return scorer
