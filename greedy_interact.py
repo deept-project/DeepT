@@ -65,7 +65,9 @@ if __name__ == "__main__":
         bos_id=tokenizer.bos_token_id,
         eos_id=tokenizer.eos_token_id,
         min_length=1,
-        max_length=64)
+        max_length=64,
+        top_k=5
+    )
 
     def predit_fn(source_inputs: List[torch.Tensor], states: List[torch.Tensor]):
         batch_size = len(source_inputs)

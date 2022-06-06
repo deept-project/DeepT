@@ -1,3 +1,4 @@
+from typing import Dict
 import pytorch_lightning as pl
 import torch
 import transformers
@@ -26,7 +27,7 @@ class BartForMaskedLM(pl.LightningModule):
         self.transformer = transformers.MBartModel.from_pretrained("facebook/mbart-large-50-many-to-many-mmt")
         self.lm_head = torch.nn.Linear(self.d_model, self.vocab_size, bias=False)
 
-    def forward(self, source_tokens, target_tokens):
+    def forward(self, source_tokens: Dict[str, torch.Tensor], target_tokens: Dict[str, torch.Tensor]):
         inputs, labels = source_tokens, target_tokens
 
         input_ids, input_mask = inputs["token_ids"], inputs["mask"]
@@ -49,7 +50,7 @@ class BartForMaskedLM(pl.LightningModule):
 
         return lm_logits
 
-    def training_step(self, batch, batch_idx):
+    def training_step(self, batch, batch_idx: int):
         # training_step defined the train loop.
         # It is independent of forward
         inputs, labels = batch
@@ -73,8 +74,7 @@ class BartForMaskedLM(pl.LightningModule):
         shift_label_ids = label_ids[..., 1:].contiguous()
 
         loss_fct = torch.nn.CrossEntropyLoss(ignore_index=self.pad_token_id)
-        loss = loss_fct(lm_logits.view(-1, self.vocab_size),
-                        shift_label_ids.view(-1))
+        loss = loss_fct(lm_logits.view(-1, self.vocab_size), shift_label_ids.view(-1))
 
         # Logging to TensorBoard by default
         self.log('train_loss', loss)
@@ -129,8 +129,7 @@ class BartForMaskedLM(pl.LightningModule):
                 ted_dataset,
             ]
         )
-        train_sampler = torch.utils.data.RandomSampler(
-            dataset, num_samples=len(dataset)//100, replacement=True)
+        train_sampler = torch.utils.data.RandomSampler(dataset, num_samples=len(dataset)//100, replacement=True)
 
         pad_fn_object = PadFunction(self.tokenizer.pad_token_id)
         train_loader = torch.utils.data.DataLoader(dataset, num_workers=8, batch_size=self.batch_size, collate_fn=pad_fn_object, sampler=train_sampler, pin_memory=True)
@@ -145,8 +144,7 @@ class BartForMaskedLM(pl.LightningModule):
         valid_sampler = torch.utils.data.SequentialSampler(valid_dataset)
 
         pad_fn_object = PadFunction(self.tokenizer.pad_token_id)
-        valid_loader = torch.utils.data.DataLoader(
-            valid_dataset, num_workers=4, batch_size=self.batch_size, collate_fn=pad_fn_object, sampler=valid_sampler, pin_memory=True)
+        valid_loader = torch.utils.data.DataLoader(valid_dataset, num_workers=4, batch_size=self.batch_size, collate_fn=pad_fn_object, sampler=valid_sampler, pin_memory=True)
 
         return valid_loader
 

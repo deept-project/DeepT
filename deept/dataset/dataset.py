@@ -85,7 +85,6 @@ class TranslationDataset(torch.utils.data.Dataset):
 
 
 class TranslationLazyDataset(torch.utils.data.Dataset):
-    # @profile
     def __init__(self, source_path, target_path, tokenizer=None):
         self.source_path = source_path
         self.target_path = target_path

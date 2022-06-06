@@ -95,7 +95,7 @@ if __name__ == "__main__":
 
     source_inputs = inputs['input_ids']
     batch_size = source_inputs.size(0)
-    init_states = torch.full((batch_size, 1), tokenizer.bos_token_id)
+    init_states = torch.full((batch_size, 1), tokenizer.bos_token_id, device=model.device)
     translation_ids = greedy_search.search(source_inputs, init_states, predit_fn)
 
 
