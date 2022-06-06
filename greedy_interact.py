@@ -4,7 +4,8 @@ from deept.model.mbart import BartForMaskedLM
 import pytorch_lightning as pl
 import torch
 import transformers
-from deept.tranalate.translate import GreedySearch, BeamSearch, BeamSearchSlow
+from deept.decode.greedy_strategy import GreedySearch
+from deept.decode.beam_strategy import BeamSearch, BeamSearchSlow
 from deept.utils import PadFunction
 
 import glob

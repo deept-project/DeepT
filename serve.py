@@ -8,7 +8,7 @@ from enum import Enum
 import threading
 
 import transformers
-from deept.tranalate.translate import GreedySearch
+from deept.decode.translate import GreedySearch
 
 from flask import Flask
 
