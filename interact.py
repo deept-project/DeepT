@@ -10,7 +10,7 @@ from deept.utils import PadFunction
 
 import glob
 
-device='cuda'
+device='cuda:1'
 
 def is_chinese(uchar):
     if uchar >= u'\u4e00' and uchar <= u'\u9fa5':

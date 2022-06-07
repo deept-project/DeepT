@@ -11,7 +11,7 @@ import torch
 import tqdm
 import numpy as np
 
-from deept.decode.translate import GreedySearch
+from deept.decode.greedy_strategy import GreedySearch
 
 import random
 import os

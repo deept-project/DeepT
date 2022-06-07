@@ -94,7 +94,7 @@ class TranslationLazyDataset(torch.utils.data.Dataset):
             self.tokenizer = transformers.MBart50Tokenizer.from_pretrained("facebook/mbart-large-50-many-to-many-mmt")
         else:
             self.tokenizer = tokenizer
-        self.max_length = 512
+        self.max_length = 256
 
         print(f'tokenize source texts from {self.source_path}')
         with open(self.source_path, 'r', encoding='utf-8') as f:
