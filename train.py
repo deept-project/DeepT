@@ -59,7 +59,7 @@ if __name__ == "__main__":
         accumulate_grad_batches=4,
         sync_batchnorm=True,
         checkpoint_callback=True,
-        # resume_from_checkpoint="tb_logs/translation/version_1/checkpoints/epoch=0-step=17106.ckpt",
+        resume_from_checkpoint="tb_logs/translation/version_1/checkpoints/epoch=18-step=325013.ckpt",
         logger=logger,
         callbacks=[early_stop_callback],
         # profiler="simple",

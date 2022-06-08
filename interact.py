@@ -59,7 +59,7 @@ if __name__ == "__main__":
     # tokenizer.lang_code_to_id["fr_XX"]
 
     # Generate Summary
-    greedy_search = BeamSearchSlow(
+    search_strategy = BeamSearchSlow(
         pad_id=tokenizer.pad_token_id,
         bos_id=tokenizer.bos_token_id,
         eos_id=tokenizer.eos_token_id,
@@ -79,7 +79,9 @@ if __name__ == "__main__":
         text = input('请输入原文：')
         print("输入是：" + text)
 
-        inputs = tokenizer([text.strip()], max_length=512, truncation=True, padding=True, return_tensors='pt')
+        inputs = tokenizer([text.strip()], max_length=256, truncation=True, padding=True, return_tensors='pt')
+
+        print("序列token数量：", inputs['input_ids'].shape[1])
 
         # texts = ["hello world", "Also, note that the copy mechanism is only applied to the raw dataset of source code tokens."]
         # inputs = tokenizer(texts, max_length=512, truncation=True, padding=True, return_tensors='pt')
@@ -87,10 +89,11 @@ if __name__ == "__main__":
         source_inputs = inputs['input_ids'].to(device)
         batch_size = source_inputs.size(0)
         init_states = torch.full((batch_size, 1), bos_token_id).to(device)
-        translation_ids = greedy_search.search(source_inputs, init_states, predit_fn)
+        translation_ids = search_strategy.search(source_inputs, init_states, predit_fn)
 
-        # translation_ids = greedy_search.search(output)
+        # translation_ids = search_strategy.search(output)
         
         for i in range(batch_size):
             translation = vector_to_text(tokenizer, translation_ids[i])
+            print("out token number:", len(translation_ids[i]))
             print(f'{i+1}/{batch_size}:\n{translation}')

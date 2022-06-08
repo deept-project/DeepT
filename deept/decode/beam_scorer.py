@@ -39,7 +39,7 @@ class MeanLogProbScorer(BeamScorer):
 class MeanLogProbWithLengthPenaltyScorer(BeamScorer):
     def __init__(self):
         super(MeanLogProbWithLengthPenaltyScorer, self).__init__()
-        self.length_penalty = 0.7
+        self.length_penalty = 0.9
 
         self.log_prob = 0.0
         self.length = 0
@@ -67,8 +67,8 @@ class MeanLogProbWithLengthPenaltyScorer(BeamScorer):
 class MeanLogProbWithRepetitionPenaltyScorer(BeamScorer):
     def __init__(self):
         super(MeanLogProbWithRepetitionPenaltyScorer, self).__init__()
-        self.length_penalty = 0.7
-        self.repetition_penalty = 0.9
+        self.length_penalty = 0.99
+        self.repetition_penalty = 0.95
 
         self.previous_tokens = set()
         self.log_prob = 0.0
